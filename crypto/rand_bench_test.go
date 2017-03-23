@@ -24,10 +24,12 @@ func BenchmarkRandIntnLarge(b *testing.B) {
 
 // BenchmarkRead benchmarks the speed of Read for small slices.
 func BenchmarkRead32(b *testing.B) {
-	b.SetBytes(32)
+	b.SetBytes(32 * 5e3)
 	buf := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
-		Read(buf)
+		for j := 0; j < 5e3; j++ {
+			Read(buf)
+		}
 	}
 }
 
