@@ -10,7 +10,7 @@ import (
 )
 
 // randReader reads entropy from the package's global entropy pool.
-type randReader struct {}
+type randReader struct{}
 
 // entropyChan holds a buffer of 32kb of entropy, so that entropy can be served
 // quickly and restored in the background. Entropy can be refilled in parallel.
