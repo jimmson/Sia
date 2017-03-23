@@ -3,8 +3,8 @@ package crypto
 import (
 	"crypto/rand"
 	"math"
+	"sync"
 	"testing"
-	"time"
 )
 
 // BenchmarkRandIntn benchmarks the RandIntn function for small ints.
@@ -40,22 +40,75 @@ func BenchmarkRead64K(b *testing.B) {
 	}
 }
 
-// BenchmarkReadContention benchmarks the speed of Read when 4 other
-// goroutines are calling RandIntn in a tight loop.
-func BenchmarkReadContention(b *testing.B) {
-	b.SetBytes(32)
-	for j := 0; j < 4; j++ {
-		go func() {
-			for {
-				RandIntn(1)
-				time.Sleep(time.Microsecond)
-			}
-		}()
-	}
-	buf := make([]byte, 32)
-	b.ResetTimer()
+// BenchmarkRead4Threads benchmarks the speed of Read when it's being using
+// across four threads.
+func BenchmarkRead4Threads(b *testing.B) {
+	b.SetBytes(4 * 32)
+	var wg sync.WaitGroup
 	for i := 0; i < b.N; i++ {
-		Read(buf)
+		wg.Add(4)
+		for i := 0; i < 4; i++ {
+			go func() {
+				buf := make([]byte, 32)
+				Read(buf)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+// BenchmarkRead4Threads64k benchmarks the speed of Read when it's being using
+// across four threads with 64kb read sizes.
+func BenchmarkRead4Threads64k(b *testing.B) {
+	b.SetBytes(4 * 64e3)
+	var wg sync.WaitGroup
+	for i := 0; i < b.N; i++ {
+		wg.Add(4)
+		for i := 0; i < 4; i++ {
+			go func() {
+				buf := make([]byte, 64e3)
+				Read(buf)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+// BenchmarkRead64Threads benchmarks the speed of Read when it's being using
+// across four threads.
+func BenchmarkRead64Threads(b *testing.B) {
+	b.SetBytes(64 * 32)
+	var wg sync.WaitGroup
+	for i := 0; i < b.N; i++ {
+		wg.Add(64)
+		for i := 0; i < 64; i++ {
+			go func() {
+				buf := make([]byte, 32)
+				Read(buf)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+// BenchmarkRead64Threads64k benchmarks the speed of Read when it's being using
+// across four threads with 64kb read sizes.
+func BenchmarkRead64Threads64k(b *testing.B) {
+	b.SetBytes(64 * 64e3)
+	var wg sync.WaitGroup
+	for i := 0; i < b.N; i++ {
+		wg.Add(64)
+		for i := 0; i < 64; i++ {
+			go func() {
+				buf := make([]byte, 64e3)
+				Read(buf)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
 	}
 }
 

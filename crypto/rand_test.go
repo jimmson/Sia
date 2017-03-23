@@ -3,7 +3,11 @@ package crypto
 import (
 	"bytes"
 	"compress/gzip"
+	"io"
+	"math/big"
+	"sync"
 	"testing"
+	"time"
 )
 
 // panics returns true if the function fn panicked.
@@ -59,6 +63,112 @@ func TestRead(t *testing.T) {
 	if b.Len() < size {
 		t.Error("supposedly high entropy bytes have been compressed!")
 	}
+}
+
+// TestRandConcurrent checks that there are no race conditions when using the
+// rngs concurrently.
+func TestRandConcurrent(t *testing.T) {
+	// Spin up a thread calling each of the functions offered by the rand
+	// package.
+	closeChan := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				wg.Done()
+				return
+			default:
+			}
+
+			// Read some random data into a byte slice.
+			buf := make([]byte, 32)
+			Read(buf)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				wg.Done()
+				return
+			default:
+			}
+
+			// Read some random data into a large byte slice.
+			buf := make([]byte, 16e3)
+			Read(buf)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				wg.Done()
+				return
+			default:
+			}
+
+			// Call io.Copy on the global reader.
+			buf := new(bytes.Buffer)
+			io.CopyN(buf, Reader, 16e3)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				wg.Done()
+				return
+			default:
+			}
+
+			// Call RandIntn
+			_ = RandIntn(250)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				wg.Done()
+				return
+			default:
+			}
+
+			// Call RandBigIntn
+			b := big.NewInt(1e16)
+			b = b.Mul(b, b)
+			b = b.Mul(b, b)
+			_ = RandBigIntn(b)
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-closeChan:
+				wg.Done()
+				return
+			default:
+			}
+
+			// Call Perm
+			_ = Perm(150)
+		}
+	}()
+
+	// Wait for a second.
+	time.Sleep(time.Second)
+
+	// Close the channel and wait for everything to clean up.
+	close(closeChan)
+	wg.Wait()
 }
 
 // TestPerm tests the Perm function.
